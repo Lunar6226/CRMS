@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Report Crime – CRMS{% endblock %}
+{% block extra_styles %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <div class="breadcrumb">Dashboard / <span>Report Crime</span></div>
+  <h1>Report a Crime</h1>
+  <p>Fill in the details below. All information is handled confidentially.</p>
+</div>
+
+<div class="card fade-in" style="max-width:760px">
+  <form method="POST" enctype="multipart/form-data">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Crime Type *</label>
+        <select name="crime_type" required>
+          <option value="">Select crime type…</option>
+          <option>Theft</option>
+          <option>Robbery</option>
+          <option>Assault</option>
+          <option>Murder</option>
+          <option>Rape / Sexual Assault</option>
+          <option>Domestic Violence</option>
+          <option>Fraud / Scam</option>
+          <option>Cybercrime</option>
+          <option>Drug Trafficking</option>
+          <option>Vandalism</option>
+          <option>Kidnapping</option>
+          <option>Corruption</option>
+          <option>Traffic Accident</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Give your periority Level</label>
+        <select name="priority">
+          <option value="Low">Low</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="High">High – Immediate Danger</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Location / Address *</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" name="location" id="locationInput" placeholder="e.g. Arusha Bus Terminal, Sokoine Road" required style="flex:1">
+        <button type="button" class="btn btn-outline btn-sm" onclick="useMyLocation()" id="locBtn" style="white-space:nowrap"><i class="fas fa-location-crosshairs"></i> Use My Location</button>
+      </div>
+      <input type="hidden" name="latitude" id="latInput">
+      <input type="hidden" name="longitude" id="lngInput">
+      <div id="mapPreview" style="display:none;margin-top:10px;border-radius:10px;overflow:hidden;border:1px solid var(--border);height:200px"></div>
+      <p id="locStatus" style="font-size:.78rem;color:var(--text3);margin-top:6px"></p>
+    </div>
+
+    <div class="form-group">
+      <label>Date & Time of Incident *</label>
+      <input type="datetime-local" name="incident_date" required>
+    </div>
+
+    <div class="form-group">
+      <label>Description *</label>
+      <textarea name="description" placeholder="Describe what happened in as much detail as possible…" rows="5" required></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Upload Evidence (Photos, Videos, Documents)</label>
+      <div id="dropzone" style="border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:.2s" onclick="document.getElementById('evidence').click()">
+        <i class="fas fa-cloud-arrow-up" style="font-size:2rem;color:var(--text3);margin-bottom:10px;display:block"></i>
+        <p style="color:var(--text2);font-size:.9rem">Click to upload or drag & drop files here</p>
+        <p style="color:var(--text3);font-size:.8rem;margin-top:4px">JPG, PNG, GIF, PDF, MP4 — Max 16 MB each</p>
+      </div>
+      <input type="file" id="evidence" name="evidence" multiple accept=".jpg,.jpeg,.png,.gif,.pdf,.mp4,.mov" style="display:none" onchange="showFiles(this)">
+      <div id="file-list" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px"></div>
+    </div>
+
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:.875rem;cursor:pointer">
+        <input type="checkbox" name="anonymous" style="width:auto;cursor:pointer">
+        <span style="color:var(--text)">Report anonymously (your identity will not be shown to officers)</span>
+      </label>
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:8px">
+      <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Submit Report</button>
+      <a href="{{ url_for('dashboard') }}" class="btn btn-outline"><i class="fas fa-xmark"></i> Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const dropzone = document.getElementById('dropzone');
+dropzone.addEventListener('dragover', e=>{ e.preventDefault(); dropzone.style.borderColor='var(--accent)'; });
+dropzone.addEventListener('dragleave', ()=>{ dropzone.style.borderColor='var(--border)'; });
+dropzone.addEventListener('drop', e=>{ e.preventDefault(); dropzone.style.borderColor='var(--border)'; const dt=new DataTransfer(); [...document.getElementById('evidence').files, ...e.dataTransfer.files].forEach(f=>dt.items.add(f)); document.getElementById('evidence').files=dt.files; showFiles(document.getElementById('evidence')); });
+function showFiles(input){
+  const list=document.getElementById('file-list');
+  list.innerHTML='';
+  [...input.files].forEach(f=>{
+    const chip=document.createElement('div');
+    chip.style.cssText='display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:.8rem';
+    chip.innerHTML=`<i class="fas fa-file" style="color:var(--accent)"></i>${f.name}`;
+    list.appendChild(chip);
+  });
+}
+// Set max date to now
+document.querySelector('input[type=datetime-local]').max = new Date().toISOString().slice(0,16);
+
+let reportMap=null, reportMarker=null;
+function useMyLocation(){
+  const btn=document.getElementById('locBtn'), status=document.getElementById('locStatus');
+  if(!navigator.geolocation){ status.textContent='Geolocation is not supported by your browser.'; status.style.color='var(--red)'; return; }
+  btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Locating…';
+  status.textContent='Requesting your location…'; status.style.color='var(--text3)';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const {latitude,longitude,accuracy}=pos.coords;
+    document.getElementById('latInput').value=latitude;
+    document.getElementById('lngInput').value=longitude;
+    btn.disabled=false; btn.innerHTML='<i class="fas fa-location-crosshairs"></i> Update Location';
+    status.innerHTML=`<i class="fas fa-circle-check" style="color:var(--green)"></i> Location captured (accuracy ~${Math.round(accuracy)}m)`;
+    status.style.color='var(--text2)';
+    showMapPreview(latitude,longitude);
+    reverseGeocode(latitude,longitude);
+  }, err=>{
+    btn.disabled=false; btn.innerHTML='<i class="fas fa-location-crosshairs"></i> Use My Location';
+    status.textContent='Could not get location: '+err.message+'. Please type the address manually.';
+    status.style.color='var(--red)';
+  }, {enableHighAccuracy:true, timeout:10000});
+}
+function showMapPreview(lat,lng){
+  const el=document.getElementById('mapPreview');
+  el.style.display='block';
+  if(!reportMap){
+    reportMap=L.map('mapPreview').setView([lat,lng],16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(reportMap);
+    reportMarker=L.marker([lat,lng]).addTo(reportMap);
+  } else {
+    reportMap.setView([lat,lng],16);
+    reportMarker.setLatLng([lat,lng]);
+  }
+  setTimeout(()=>reportMap.invalidateSize(),200);
+}
+async function reverseGeocode(lat,lng){
+  const inp=document.getElementById('locationInput');
+  if(inp.value.trim()) return;
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+    const d=await r.json();
+    if(d.display_name) inp.value=d.display_name;
+  }catch(e){}
+}
+</script>
+{% endblock %}

@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Live Emergencies – CRMS{% endblock %}
+{% block extra_styles %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+#emergencyMap{height:480px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border)}
+.ealert-card{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer;transition:.15s;background:var(--bg3)}
+.ealert-card:hover{border-color:var(--red);box-shadow:0 4px 14px rgba(232,64,64,.15)}
+.ealert-card.selected{border-color:var(--red);background:rgba(232,64,64,.08)}
+.ealert-card.status-active{border-left:4px solid var(--red)}
+.ealert-card.status-acknowledged{border-left:4px solid var(--blue)}
+.etype-icon{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:1rem;flex-shrink:0}
+.etype-fire{background:rgba(232,64,64,.15);color:var(--red)}
+.etype-medical{background:rgba(48,128,232,.15);color:var(--blue)}
+.etype-violence{background:rgba(136,96,232,.15);color:var(--purple)}
+.etype-general{background:rgba(232,160,32,.15);color:var(--accent)}
+.pulse-dot{width:9px;height:9px;border-radius:50%;background:var(--red);display:inline-block;animation:sosLive2 1.4s infinite;margin-right:5px}
+@keyframes sosLive2{0%{box-shadow:0 0 0 0 rgba(232,64,64,.6)}70%{box-shadow:0 0 0 8px rgba(232,64,64,0)}100%{box-shadow:0 0 0 0 rgba(232,64,64,0)}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <h1><i class="fas fa-triangle-exclamation" style="color:var(--red)"></i> Live Emergencies</h1>
+  <p>Real-time emergency alerts from citizens with live location tracking</p>
+</div>
+
+<div class="stat-grid fade-in">
+  <div class="stat-card">
+    <div class="stat-icon" style="background:rgba(232,64,64,.15);color:var(--red)"><i class="fas fa-bell"></i></div>
+    <div><div class="stat-value" id="activeCount">{{ active|selectattr('status','equalto','Active')|list|length }}</div><div class="stat-label">Active Alerts</div></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:rgba(48,128,232,.15);color:var(--blue)"><i class="fas fa-eye"></i></div>
+    <div><div class="stat-value">{{ active|selectattr('status','equalto','Acknowledged')|list|length }}</div><div class="stat-label">Acknowledged</div></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:rgba(48,192,96,.15);color:var(--green)"><i class="fas fa-circle-check"></i></div>
+    <div><div class="stat-value">{{ resolved|length }}</div><div class="stat-label">Resolved Recently</div></div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
+  <div class="card fade-in">
+    <div class="card-header"><span class="card-title">Map View</span><span style="font-size:.78rem;color:var(--text3)"><span class="pulse-dot"></span>Live — auto-refreshing</span></div>
+    <div id="emergencyMap"></div>
+  </div>
+
+  <div class="card fade-in">
+    <div class="card-header"><span class="card-title">Active Alerts</span></div>
+    <div id="alertList" style="max-height:480px;overflow-y:auto">
+      <div style="text-align:center;color:var(--text3);padding:24px;font-size:.85rem">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<div class="card fade-in" style="margin-top:20px">
+  <div class="card-header"><span class="card-title">Recently Resolved</span></div>
+  {% if resolved %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Citizen</th><th>Type</th><th>Triggered</th><th>Resolved</th><th>Handled By</th></tr></thead>
+      <tbody>
+        {% for a in resolved %}
+        <tr>
+          <td>{{ a.user.full_name }}</td>
+          <td>{{ a.alert_type }}</td>
+          <td style="font-size:.8rem;color:var(--text3)">{{ a.created_at.strftime('%b %d, %H:%M') }}</td>
+          <td style="font-size:.8rem;color:var(--text3)">{{ a.resolved_at.strftime('%b %d, %H:%M') if a.resolved_at }}</td>
+          <td>{{ a.acknowledged_by.full_name if a.acknowledged_by else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><i class="fas fa-clipboard-check"></i><p>No resolved emergencies yet</p></div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const typeIcon={'Fire':'fa-fire','Medical':'fa-truck-medical','Violence':'fa-user-shield','General':'fa-triangle-exclamation'};
+const typeClass={'Fire':'etype-fire','Medical':'etype-medical','Violence':'etype-violence','General':'etype-general'};
+let map=L.map('emergencyMap').setView([-3.3869,36.6830],7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+let markers={};
+let selectedId=null;
+
+function pulseIcon(color){
+  return L.divIcon({className:'',html:`<div style="width:22px;height:22px;border-radius:50%;background:${color};border:3px solid #1a1e2e;box-shadow:0 0 0 4px ${color}55"></div>`,iconSize:[22,22],iconAnchor:[11,11]});
+}
+
+async function refreshEmergencies(){
+  try{
+    const r=await fetch('/api/emergencies/active');
+    const data=await r.json();
+    document.getElementById('activeCount').textContent=data.filter(a=>a.status==='Active').length;
+    renderList(data);
+    renderMarkers(data);
+  }catch(e){}
+}
+
+function renderList(data){
+  const list=document.getElementById('alertList');
+  if(!data.length){
+    list.innerHTML='<div style="text-align:center;color:var(--text3);padding:32px 16px"><i class="fas fa-shield-halved" style="font-size:2rem;display:block;margin-bottom:10px;color:var(--accent)"></i>No active emergencies right now</div>';
+    return;
+  }
+  list.innerHTML=data.map(a=>`
+    <div class="ealert-card status-${a.status.toLowerCase()} ${selectedId===a.id?'selected':''}" onclick="focusAlert(${a.id})">
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <div class="etype-icon ${typeClass[a.alert_type]||'etype-general'}"><i class="fas ${typeIcon[a.alert_type]||'fa-triangle-exclamation'}"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <strong style="font-size:.9rem;color:var(--text)">${a.user_name}</strong>
+            ${a.status==='Active'?'<span class="pulse-dot"></span>':''}
+          </div>
+          <div style="font-size:.78rem;color:var(--text3);margin-top:2px">${a.alert_type} · ${a.user_phone||'No phone'}</div>
+          <div style="font-size:.75rem;color:var(--text3);margin-top:4px">Triggered ${a.created_at} · Updated ${a.updated_at}</div>
+          <div style="margin-top:6px">
+            <span class="pill pill-${a.status==='Active'?'high':'investigating'}" style="font-size:.7rem">${a.status}</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px">
+        ${a.status==='Active'?`<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();acknowledge(${a.id})" style="flex:1;justify-content:center"><i class="fas fa-eye"></i> Acknowledge</button>`:''}
+        <button class="btn btn-sm" onclick="event.stopPropagation();resolveAlert(${a.id})" style="flex:1;justify-content:center;background:rgba(48,192,96,.15);color:var(--green);border:1px solid rgba(48,192,96,.3)"><i class="fas fa-circle-check"></i> Resolve</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderMarkers(data){
+  const seen=new Set();
+  data.forEach(a=>{
+    seen.add(a.id);
+    const color=a.status==='Active'?'#e84040':'#3080e8';
+    if(markers[a.id]){
+      markers[a.id].setLatLng([a.latitude,a.longitude]);
+      markers[a.id].setIcon(pulseIcon(color));
+    } else {
+      const m=L.marker([a.latitude,a.longitude],{icon:pulseIcon(color)}).addTo(map);
+      m.bindPopup(`<strong>${a.user_name}</strong><br>${a.alert_type} emergency<br>${a.status}`);
+      m.on('click',()=>focusAlert(a.id));
+      markers[a.id]=m;
+    }
+  });
+  Object.keys(markers).forEach(id=>{
+    if(!seen.has(parseInt(id))){ map.removeLayer(markers[id]); delete markers[id]; }
+  });
+  if(data.length && !selectedId){
+    const first=data[0];
+    map.setView([first.latitude,first.longitude],14);
+  }
+}
+
+function focusAlert(id){
+  selectedId=id;
+  const m=markers[id];
+  if(m){ map.setView(m.getLatLng(),16); m.openPopup(); }
+  refreshEmergencies();
+}
+
+async function acknowledge(id){
+  await fetch(`/officer/emergency/${id}/acknowledge`,{method:'POST'});
+  refreshEmergencies();
+}
+
+async function resolveAlert(id){
+  if(!confirm('Mark this emergency as resolved?')) return;
+  await fetch(`/officer/emergency/${id}/resolve`,{method:'POST'});
+  if(selectedId===id) selectedId=null;
+  refreshEmergencies();
+}
+
+refreshEmergencies();
+setInterval(refreshEmergencies, 4000);
+</script>
+{% endblock %}

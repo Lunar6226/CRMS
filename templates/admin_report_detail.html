@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Manage Case {{ report.case_number }} – CRMS{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <div class="breadcrumb">Dashboard / <a href="{{ url_for('admin_reports') }}">Reports</a> / <span>{{ report.case_number }}</span></div>
+  <h1 style="font-family:var(--mono)">{{ report.case_number }}</h1>
+  <p>{{ report.crime_type }} · {{ report.location }}</p>
+</div>
+
+<div style="display:grid;grid-template-columns:3fr 2fr;gap:20px">
+  <div>
+    <div class="card fade-in" style="margin-bottom:20px">
+      <div class="card-title" style="margin-bottom:16px">Case Details</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div><div style="font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Reporter</div><div style="margin-top:4px">{% if report.anonymous %}Anonymous{% else %}{{ report.reporter.full_name }}<br><span style="font-size:.82rem;color:var(--text2)">{{ report.reporter.email }}</span>{% endif %}</div></div>
+        <div><div style="font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Incident Date</div><div style="margin-top:4px">{{ report.incident_date.strftime('%B %d, %Y %H:%M') }}</div></div>
+        <div><div style="font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Submitted</div><div style="margin-top:4px">{{ report.created_at.strftime('%B %d, %Y') }}</div></div>
+        <div><div style="font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Last Updated</div><div style="margin-top:4px">{{ report.updated_at.strftime('%B %d, %Y') }}</div></div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:16px">
+        <div style="font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Description</div>
+        <p style="color:var(--text2);line-height:1.7">{{ report.description }}</p>
+      </div>
+      {% if report.ai_flagged %}
+      <div class="alert" style="margin-top:16px;background:rgba(136,96,232,.1);border:1px solid rgba(136,96,232,.3);color:var(--purple);align-items:flex-start">
+        <i class="fas fa-robot" style="margin-top:2px"></i>
+        <div>
+          <strong>Possibly AI-generated text ({{ report.ai_flag_score|round|int }}% likelihood)</strong>
+          <p style="margin-top:4px;font-size:.82rem;color:var(--text2)">This is an automated heuristic signal for extra scrutiny during review — not proof. Reasons flagged:</p>
+          <ul style="margin:6px 0 0 18px;font-size:.82rem;color:var(--text2)">
+            {% for reason in report.ai_flag_reasons.split('; ') %}<li>{{ reason }}</li>{% endfor %}
+          </ul>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if report.evidence %}
+    <div class="card fade-in" style="margin-bottom:20px">
+      <div class="card-title" style="margin-bottom:16px"><i class="fas fa-paperclip"></i> Evidence Files</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        {% for ev in report.evidence %}
+        {% if 'image' in ev.file_type %}
+        <a href="{{ url_for('uploaded_file', filename=ev.filename) }}" target="_blank">
+          <img src="{{ url_for('uploaded_file', filename=ev.filename) }}" style="width:120px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+        </a>
+        {% else %}
+        <a href="{{ url_for('uploaded_file', filename=ev.filename) }}" target="_blank" class="btn btn-sm btn-outline">
+          <i class="fas fa-file"></i> {{ ev.original_name[:24] }}
+        </a>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card fade-in">
+      <div class="card-title" style="margin-bottom:16px"><i class="fas fa-timeline"></i> Case History</div>
+      <ul class="timeline">
+        <li class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-time">{{ report.created_at.strftime('%b %d, %Y %H:%M') }}</div>
+          <div class="tl-msg">Case submitted</div>
+        </li>
+        {% for upd in report.updates|sort(attribute='created_at') %}
+        <li class="tl-item">
+          <div class="tl-dot" style="background:{% if upd.status_change=='Resolved' %}var(--green){% elif upd.status_change %}var(--blue){% else %}var(--text3){% endif %}"></div>
+          <div class="tl-time">{{ upd.created_at.strftime('%b %d, %Y %H:%M') }} · {{ upd.officer.full_name if upd.officer else 'System' }}</div>
+          {% if upd.status_change %}<div style="margin-top:3px"><span class="pill pill-{% if upd.status_change=='Resolved' %}resolved{% elif upd.status_change=='Under Investigation' %}investigating{% else %}pending{% endif %}" style="font-size:.72rem">→ {{ upd.status_change }}</span></div>{% endif %}
+          <div class="tl-msg">{{ upd.message }}</div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="card fade-in" style="margin-top:20px">
+      <div class="card-title" style="margin-bottom:16px"><i class="fas fa-comments"></i> Case Discussion</div>
+      <div class="chat-box" id="chatBox"><div class="empty" style="padding:20px"><i class="fas fa-spinner fa-spin"></i></div></div>
+      <div class="chat-input-row">
+        <textarea id="chatInput" placeholder="Reply to the reporter to clarify details…"></textarea>
+        <button class="btn btn-primary btn-icon" id="chatSendBtn" title="Send"><i class="fas fa-paper-plane"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card fade-in">
+      <div class="card-title" style="margin-bottom:20px">Update Case</div>
+      <form method="POST">
+        <div class="form-group">
+          <label>Case Status</label>
+          <select name="status">
+            <option {% if report.status=='Pending' %}selected{% endif %}>Pending</option>
+            <option {% if report.status=='Under Investigation' %}selected{% endif %}>Under Investigation</option>
+            <option {% if report.status=='Resolved' %}selected{% endif %}>Resolved</option>
+            <option {% if report.status=='Closed' %}selected{% endif %}>Closed</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select name="priority">
+            <option {% if report.priority=='Low' %}selected{% endif %}>Low</option>
+            <option {% if report.priority=='Medium' %}selected{% endif %}>Medium</option>
+            <option {% if report.priority=='High' %}selected{% endif %}>High</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Assign Officer</label>
+          <select name="assigned_officer_id">
+            <option value="">— Unassigned —</option>
+            {% for o in officers %}
+            <option value="{{ o.id }}" {% if report.assigned_officer_id == o.id %}selected{% endif %}>{{ o.full_name }} ({{ o.role }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Update Note (sent to citizen)</label>
+          <textarea name="update_message" placeholder="Add a note about progress, findings, or status change…" rows="4"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center"><i class="fas fa-save"></i> Save Changes</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const REPORT_ID = {{ report.id }};
+const chatBox = document.getElementById('chatBox');
+const chatInput = document.getElementById('chatInput');
+const chatSendBtn = document.getElementById('chatSendBtn');
+
+async function loadMessages(){
+  const r = await fetch(`/api/case/${REPORT_ID}/messages`);
+  if(!r.ok) return;
+  const data = await r.json();
+  if(!data.length){
+    chatBox.innerHTML = '<p style="color:var(--text3);font-size:.85rem;text-align:center;padding:16px 0">No messages yet — start the conversation.</p>';
+    return;
+  }
+  chatBox.innerHTML = data.map(m => `
+    <div class="chat-bubble ${m.mine ? 'mine' : 'theirs'}">
+      <div>${escapeHtml(m.message)}</div>
+      <div class="chat-meta">${m.mine ? 'You' : escapeHtml(m.sender_name)} · ${m.created_at}</div>
+    </div>`).join('');
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+async function sendMessage(){
+  const text = chatInput.value.trim();
+  if(!text) return;
+  chatSendBtn.disabled = true;
+  try{
+    const r = await fetch(`/api/case/${REPORT_ID}/messages`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:text})
+    });
+    if(r.ok){ chatInput.value=''; await loadMessages(); }
+  } finally { chatSendBtn.disabled = false; }
+}
+chatSendBtn.addEventListener('click', sendMessage);
+chatInput.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); } });
+loadMessages();
+setInterval(loadMessages, 8000);
+</script>
+{% endblock %}

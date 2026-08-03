@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Manage Users – CRMS{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <h1>User Management</h1>
+  <p>Manage all registered users, roles, and account status</p>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <span class="card-title">{{ users|length }} Users</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Verified</th><th>Reports</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);display:grid;place-items:center;color:#000;font-size:.8rem;font-weight:700;flex-shrink:0">{{ u.full_name[0] }}</div>
+              {{ u.full_name }}
+            </div>
+          </td>
+          <td style="color:var(--text2);font-size:.85rem">{{ u.email }}</td>
+          <td style="color:var(--text2);font-size:.85rem">{{ u.phone or '—' }}</td>
+          <td>
+            <select class="role-select" data-uid="{{ u.id }}" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:.8rem;width:auto">
+              <option {% if u.role=='citizen' %}selected{% endif %}>citizen</option>
+              <option {% if u.role=='officer' %}selected{% endif %}>officer</option>
+              <option {% if u.role=='admin' %}selected{% endif %}>admin</option>
+            </select>
+          </td>
+          <td>
+            {% if u.email_verified %}
+            <span class="pill pill-resolved" style="font-size:.72rem"><i class="fas fa-circle-check"></i> Verified</span>
+            {% else %}
+            <span class="pill pill-pending" style="font-size:.72rem"><i class="fas fa-clock"></i> Pending</span>
+            {% endif %}
+          </td>
+          <td style="font-family:var(--mono);color:var(--text2)">{{ u.reports|length }}</td>
+          <td style="font-size:.8rem;color:var(--text3)">{{ u.created_at.strftime('%b %d, %Y') }}</td>
+          <td>
+            {% if u.is_active %}
+            <span class="pill pill-resolved">Active</span>
+            {% else %}
+            <span class="pill pill-closed">Suspended</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.id != current_user.id %}
+            <button class="btn btn-sm {% if u.is_active %}btn-danger{% else %}btn-outline{% endif %}" onclick="toggleUser({{ u.id }}, this)">
+              {% if u.is_active %}<i class="fas fa-ban"></i> Suspend{% else %}<i class="fas fa-check"></i> Activate{% endif %}
+            </button>
+            {% else %}
+            <span style="color:var(--text3);font-size:.82rem">You</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function toggleUser(uid, btn){
+  const r = await fetch(`/admin/users/${uid}/toggle`,{method:'POST'});
+  const data = await r.json();
+  const row = btn.closest('tr');
+  const statusCell = row.querySelector('.pill');
+  if(data.active){
+    statusCell.className='pill pill-resolved'; statusCell.textContent='Active';
+    btn.className='btn btn-sm btn-danger'; btn.innerHTML='<i class="fas fa-ban"></i> Suspend';
+  } else {
+    statusCell.className='pill pill-closed'; statusCell.textContent='Suspended';
+    btn.className='btn btn-sm btn-outline'; btn.innerHTML='<i class="fas fa-check"></i> Activate';
+  }
+}
+document.querySelectorAll('.role-select').forEach(sel=>{
+  sel.addEventListener('change', async function(){
+    const r = await fetch(`/admin/users/${this.dataset.uid}/role`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:this.value})});
+    const data = await r.json();
+    if(!data.role) alert('Error updating role');
+  });
+});
+</script>
+{% endblock %}

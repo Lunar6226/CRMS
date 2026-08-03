@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Emergency SOS – CRMS{% endblock %}
+{% block extra_styles %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+.sos-wrap{max-width:560px;margin:0 auto;text-align:center}
+.sos-btn{width:200px;height:200px;border-radius:50%;background:linear-gradient(145deg,#f04848,#c62828);color:#fff;border:none;font-size:1.2rem;font-weight:800;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;margin:32px auto;cursor:pointer;box-shadow:0 10px 30px rgba(232,64,64,.45);transition:.15s;text-transform:uppercase;letter-spacing:.05em;font-family:var(--font)}
+.sos-btn:hover{transform:scale(1.03)}
+.sos-btn:active{transform:scale(.97)}
+.sos-btn i{font-size:2.6rem}
+.sos-btn[disabled]{opacity:.6;cursor:not-allowed}
+.sos-btn.live{animation:sosLive 1.4s infinite;background:linear-gradient(145deg,#ff5252,#b71c1c)}
+@keyframes sosLive{0%{box-shadow:0 10px 30px rgba(232,64,64,.45),0 0 0 0 rgba(232,64,64,.6)}70%{box-shadow:0 10px 30px rgba(232,64,64,.45),0 0 0 24px rgba(232,64,64,0)}100%{box-shadow:0 10px 30px rgba(232,64,64,.45),0 0 0 0 rgba(232,64,64,0)}}
+.type-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:8px}
+.type-btn{background:var(--bg3);border:2px solid var(--border);border-radius:12px;padding:14px 8px;cursor:pointer;transition:.15s;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:.78rem;font-weight:600;color:var(--text2)}
+.type-btn i{font-size:1.3rem}
+.type-btn.selected{border-color:var(--red);background:rgba(232,64,64,.1);color:var(--red)}
+.live-status{display:none;background:rgba(232,64,64,.08);border:1px solid rgba(232,64,64,.3);border-radius:12px;padding:18px;margin-top:20px;text-align:left}
+#sosMap{height:240px;border-radius:12px;overflow:hidden;margin-top:16px;display:none;border:1px solid var(--border)}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <h1>Emergency SOS</h1>
+  <p>Press the button below if you are in immediate danger. Your live location will be sent to police instantly.</p>
+</div>
+
+<div class="card fade-in sos-wrap">
+  <div style="background:rgba(232,64,64,.08);border:1px solid rgba(232,64,64,.3);border-radius:10px;padding:12px 16px;font-size:.85rem;color:var(--red);margin-bottom:8px">
+    <i class="fas fa-circle-info"></i> If this is life-threatening, also call <strong>112</strong> or <strong>999</strong> if you are able to.
+  </div>
+
+  <div style="margin-top:24px">
+    <p style="font-size:.78rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">What's happening? (optional — defaults to General)</p>
+    <div class="type-grid">
+      <div class="type-btn selected" data-type="General" onclick="selectType(this)"><i class="fas fa-triangle-exclamation"></i> General</div>
+      <div class="type-btn" data-type="Fire" onclick="selectType(this)"><i class="fas fa-fire"></i> Fire</div>
+      <div class="type-btn" data-type="Medical" onclick="selectType(this)"><i class="fas fa-truck-medical"></i> Medical</div>
+      <div class="type-btn" data-type="Violence" onclick="selectType(this)"><i class="fas fa-user-shield"></i> Violence</div>
+    </div>
+  </div>
+
+  <button class="sos-btn" id="sosBtn" onclick="triggerSOS()">
+    <i class="fas fa-bell"></i>
+    <span id="sosBtnText">Send SOS</span>
+  </button>
+
+  <p id="sosHint" style="color:var(--text3);font-size:.82rem">One tap instantly shares your live location with police.</p>
+
+  <div class="live-status" id="liveStatus">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span style="width:10px;height:10px;border-radius:50%;background:var(--red);animation:sosLive 1.4s infinite"></span>
+      <strong style="color:var(--red)">LIVE — Police have been alerted</strong>
+    </div>
+    <p style="font-size:.85rem;color:var(--text2)">Your location is being tracked and shared in real time. Stay where you are if safe to do so.</p>
+    <p style="font-size:.78rem;color:var(--text3);margin-top:8px" id="lastUpdateTime"></p>
+    <div id="sosMap"></div>
+    <button class="btn btn-outline" style="width:100%;margin-top:14px;justify-content:center" onclick="cancelSOS()"><i class="fas fa-circle-check"></i> I'm Safe Now — Cancel Alert</button>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let selectedType='General';
+let activeAlertId=null;
+let watchId=null;
+let sosMap=null, sosMarker=null;
+
+function selectType(el){
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedType=el.dataset.type;
+}
+
+function triggerSOS(){
+  if(!navigator.geolocation){ alert('Geolocation not supported on this device/browser.'); return; }
+  const btn=document.getElementById('sosBtn');
+  btn.disabled=true;
+  document.getElementById('sosBtnText').textContent='Locating…';
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const {latitude,longitude,accuracy}=pos.coords;
+    try{
+      const r=await fetch('/api/emergency/trigger',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({latitude,longitude,accuracy,alert_type:selectedType})});
+      const data=await r.json();
+      if(data.ok){
+        activeAlertId=data.alert_id;
+        activateLiveMode(latitude,longitude);
+        startWatching();
+      } else {
+        alert('Could not send alert: '+(data.error||'Unknown error'));
+        btn.disabled=false; document.getElementById('sosBtnText').textContent='Send SOS';
+      }
+    }catch(e){
+      alert('Network error sending alert. Try again.');
+      btn.disabled=false; document.getElementById('sosBtnText').textContent='Send SOS';
+    }
+  }, err=>{
+    alert('Could not get your location: '+err.message+'. Please enable location access and try again.');
+    btn.disabled=false; document.getElementById('sosBtnText').textContent='Send SOS';
+  }, {enableHighAccuracy:true, timeout:10000});
+}
+
+function activateLiveMode(lat,lng){
+  const btn=document.getElementById('sosBtn');
+  btn.classList.add('live'); btn.disabled=true;
+  document.getElementById('sosBtnText').textContent='SOS ACTIVE';
+  document.getElementById('sosHint').style.display='none';
+  document.getElementById('liveStatus').style.display='block';
+  document.getElementById('sosMap').style.display='block';
+  updateMap(lat,lng);
+  document.getElementById('lastUpdateTime').textContent='Last update: '+new Date().toLocaleTimeString();
+}
+
+function updateMap(lat,lng){
+  if(!sosMap){
+    sosMap=L.map('sosMap').setView([lat,lng],16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(sosMap);
+    sosMarker=L.circleMarker([lat,lng],{radius:10,color:'#e84040',fillColor:'#e84040',fillOpacity:.6}).addTo(sosMap);
+  } else {
+    sosMap.setView([lat,lng],16);
+    sosMarker.setLatLng([lat,lng]);
+  }
+  setTimeout(()=>sosMap.invalidateSize(),200);
+}
+
+function startWatching(){
+  if(watchId) return;
+  watchId=navigator.geolocation.watchPosition(async pos=>{
+    const {latitude,longitude,accuracy}=pos.coords;
+    updateMap(latitude,longitude);
+    document.getElementById('lastUpdateTime').textContent='Last update: '+new Date().toLocaleTimeString();
+    if(activeAlertId){
+      try{
+        const r=await fetch(`/api/emergency/${activeAlertId}/ping`,{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({latitude,longitude,accuracy})});
+        const data=await r.json();
+        if(data.stopped || data.status==='Resolved'){ stopSOS(true); }
+      }catch(e){}
+    }
+  }, err=>{}, {enableHighAccuracy:true, maximumAge:3000, timeout:8000});
+}
+
+async function cancelSOS(){
+  if(!activeAlertId) return;
+  if(!confirm('Confirm you are safe and want to cancel the active emergency alert?')) return;
+  await fetch(`/api/emergency/${activeAlertId}/cancel`,{method:'POST'});
+  stopSOS(false);
+}
+
+function stopSOS(resolvedByOfficer){
+  if(watchId){ navigator.geolocation.clearWatch(watchId); watchId=null; }
+  activeAlertId=null;
+  const btn=document.getElementById('sosBtn');
+  btn.classList.remove('live'); btn.disabled=false;
+  document.getElementById('sosBtnText').textContent='Send SOS';
+  document.getElementById('sosHint').style.display='block';
+  document.getElementById('liveStatus').style.display='none';
+  if(resolvedByOfficer){ alert('Your emergency alert has been marked resolved by an officer.'); }
+}
+</script>
+{% endblock %}

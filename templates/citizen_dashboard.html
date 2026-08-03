@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard – CRMS{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <h1>Welcome, {{ current_user.full_name.split()[0] }} 👋</h1>
+  <p>Manage your crime reports and track case progress</p>
+</div>
+
+{% set pending_n = reports|selectattr('status','eq','Pending')|list|length %}
+{% set investigating_n = reports|selectattr('status','eq','Under Investigation')|list|length %}
+{% set resolved_n = reports|selectattr('status','eq','Resolved')|list|length %}
+<div class="stat-grid">
+  <div class="stat-card fade-in" style="--stat-color:var(--accent)">
+    <div class="stat-icon" style="background:rgba(232,160,32,.12);color:var(--accent)"><i class="fas fa-folder"></i></div>
+    <div class="stat-body"><div class="stat-value">{{ reports|length }}</div><div class="stat-label">Total Reports</div></div>
+  </div>
+  <div class="stat-card fade-in" style="--stat-color:var(--red)">
+    <div class="stat-icon" style="background:rgba(232,64,64,.12);color:var(--red)"><i class="fas fa-clock"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ pending_n }}</div>
+      <div class="stat-label">Pending</div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width:{{ (pending_n / reports|length * 100) if reports|length else 0 }}%"></div></div>
+    </div>
+  </div>
+  <div class="stat-card fade-in" style="--stat-color:var(--blue)">
+    <div class="stat-icon" style="background:rgba(48,128,232,.12);color:var(--blue)"><i class="fas fa-magnifying-glass"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ investigating_n }}</div>
+      <div class="stat-label">Under Investigation</div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width:{{ (investigating_n / reports|length * 100) if reports|length else 0 }}%"></div></div>
+    </div>
+  </div>
+  <div class="stat-card fade-in" style="--stat-color:var(--green)">
+    <div class="stat-icon" style="background:rgba(48,192,96,.12);color:var(--green)"><i class="fas fa-circle-check"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ resolved_n }}</div>
+      <div class="stat-label">Resolved</div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width:{{ (resolved_n / reports|length * 100) if reports|length else 0 }}%"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="quick-links fade-in">
+  <a href="{{ url_for('report_crime') }}" class="quick-link" style="--qcolor:var(--accent)">
+    <div class="qi"><i class="fas fa-file-circle-plus"></i></div>
+    <div class="qt">Report a Crime</div>
+    <div class="qd">Submit a new case in minutes</div>
+  </a>
+  <a href="{{ url_for('track') }}" class="quick-link" style="--qcolor:var(--blue)">
+    <div class="qi"><i class="fas fa-magnifying-glass"></i></div>
+    <div class="qt">Track a Case</div>
+    <div class="qd">Look up status by case number</div>
+  </a>
+  <a href="{{ url_for('wanted_list') }}" class="quick-link" style="--qcolor:var(--red)">
+    <div class="qi"><i class="fas fa-user-secret"></i></div>
+    <div class="qt">Wanted Persons</div>
+    <div class="qd">{{ wanted_active }} active public safety alert{{ 's' if wanted_active != 1 }}</div>
+  </a>
+</div>
+
+{% if notifications %}
+<div class="card fade-in" style="margin-bottom:20px;border-color:rgba(232,160,32,.3)">
+  <div class="card-header">
+    <span class="card-title"><i class="fas fa-bell" style="color:var(--accent)"></i> New Notifications</span>
+    <button class="btn btn-sm btn-outline" onclick="markAllRead()">Mark all read</button>
+  </div>
+  {% for n in notifications %}
+  <div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:.875rem">
+    <i class="fas fa-circle" style="color:var(--accent);font-size:.5rem;margin-right:8px"></i>{{ n.message }}
+    <span style="color:var(--text3);font-size:.75rem;margin-left:8px">{{ n.created_at.strftime('%b %d, %H:%M') }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="card fade-in">
+  <div class="card-header">
+    <span class="card-title">My Reports</span>
+    <a href="{{ url_for('report_crime') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Report</a>
+  </div>
+  {% if reports %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Case #</th><th>Type</th><th>Location</th><th>Date</th><th>Status</th><th>Priority</th><th></th></tr></thead>
+      <tbody>
+        {% for r in reports %}
+        <tr>
+          <td><code style="font-size:.8rem;color:var(--accent)">{{ r.case_number }}</code></td>
+          <td>{{ r.crime_type }}</td>
+          <td style="color:var(--text2)">{{ r.location[:30] }}{% if r.location|length > 30 %}…{% endif %}</td>
+          <td style="color:var(--text2);font-size:.8rem">{{ r.created_at.strftime('%b %d, %Y') }}</td>
+          <td>
+            {% if r.status == 'Pending' %}<span class="pill pill-pending">{{ r.status }}</span>
+            {% elif r.status == 'Under Investigation' %}<span class="pill pill-investigating">{{ r.status }}</span>
+            {% elif r.status == 'Resolved' %}<span class="pill pill-resolved">{{ r.status }}</span>
+            {% else %}<span class="pill pill-closed">{{ r.status }}</span>{% endif %}
+          </td>
+          <td>
+            {% if r.priority == 'High' %}<span class="pill pill-high">{{ r.priority }}</span>
+            {% elif r.priority == 'Medium' %}<span class="pill pill-medium">{{ r.priority }}</span>
+            {% else %}<span class="pill pill-low">{{ r.priority }}</span>{% endif %}
+          </td>
+          <td><a href="{{ url_for('track_case', case_number=r.case_number) }}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i></a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <i class="fas fa-folder-open"></i>
+    <p>No reports yet</p>
+    <a href="{{ url_for('report_crime') }}" class="btn btn-primary" style="margin-top:16px"><i class="fas fa-plus"></i> Submit Your First Report</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

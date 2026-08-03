@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Track Case – CRMS{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <h1>Track Your Case</h1>
+  <p>Enter your case number to check the latest status</p>
+</div>
+<div class="card fade-in" style="max-width:540px">
+  <div class="form-group">
+    <label>Case Number</label>
+    <div class="search-bar">
+      <input type="text" id="caseInput" placeholder="e.g. CR-202401-ABCD12" style="font-family:var(--mono)">
+      <button class="btn btn-primary" onclick="searchCase()"><i class="fas fa-magnifying-glass"></i> Search</button>
+    </div>
+  </div>
+  <div id="result"></div>
+</div>
+<div class="card fade-in" style="margin-top:20px;max-width:540px">
+  <div class="card-title" style="margin-bottom:16px">Or browse your reports</div>
+  <a href="{{ url_for('dashboard') }}" class="btn btn-outline"><i class="fas fa-list"></i> View All My Reports</a>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function searchCase(){
+  const cn = document.getElementById('caseInput').value.trim();
+  if(!cn){return;}
+  const res = document.getElementById('result');
+  res.innerHTML = '<div style="color:var(--text3);font-size:.875rem;padding:10px 0">Searching…</div>';
+  const r = await fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({case_number:cn})});
+  const data = await r.json();
+  if(data.error){
+    res.innerHTML=`<div class="alert alert-error"><i class="fas fa-circle-exclamation"></i> ${data.error}</div>`;
+    return;
+  }
+  const statusClass = {'Pending':'pill-pending','Under Investigation':'pill-investigating','Resolved':'pill-resolved','Closed':'pill-closed'}[data.status]||'pill-closed';
+  res.innerHTML=`
+    <div class="alert alert-info" style="margin-top:16px">
+      <div style="flex:1">
+        <div style="font-weight:600;margin-bottom:8px">Case Found</div>
+        <div style="font-size:.85rem">Case: <code style="color:var(--accent)">${data.case_number}</code></div>
+        <div style="font-size:.85rem;margin-top:4px">Type: ${data.crime_type} &nbsp;·&nbsp; Location: ${data.location}</div>
+        <div style="font-size:.85rem;margin-top:4px">Reported: ${data.created_at}</div>
+        <div style="margin-top:10px">Status: <span class="pill ${statusClass}">${data.status}</span></div>
+        <a href="/track/${data.case_number}" class="btn btn-primary btn-sm" style="margin-top:12px"><i class="fas fa-eye"></i> View Full Details</a>
+      </div>
+    </div>`;
+}
+document.getElementById('caseInput').addEventListener('keydown', e=>{ if(e.key==='Enter') searchCase(); });
+</script>
+{% endblock %}

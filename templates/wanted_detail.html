@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ person.full_name }} – Wanted – CRMS{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <div class="breadcrumb"><a href="{{ url_for('wanted_list') }}">Wanted Persons</a> / <span>{{ person.full_name }}</span></div>
+  <h1>{{ person.full_name }}{% if person.alias %} <span style="color:var(--text3);font-weight:400">"{{ person.alias }}"</span>{% endif %}</h1>
+</div>
+
+<div style="display:grid;grid-template-columns:260px 1fr;gap:20px" class="fade-in">
+  <div class="card" style="display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center">
+    <div style="width:180px;height:180px;border-radius:12px;overflow:hidden;background:var(--bg3);display:grid;place-items:center">
+      {% if person.photo %}
+      <img src="{{ url_for('uploaded_file', filename=person.photo) }}" style="width:100%;height:100%;object-fit:cover">
+      {% else %}
+      <i class="fas fa-user-secret" style="font-size:3.5rem;color:var(--text3)"></i>
+      {% endif %}
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">
+      {% if person.status == 'Wanted' %}<span class="pill pill-high"><i class="fas fa-triangle-exclamation"></i> Wanted</span>
+      {% elif person.status == 'Found' %}<span class="pill pill-resolved"><i class="fas fa-circle-check"></i> Found</span>
+      {% elif person.status == 'Arrested' %}<span class="pill pill-investigating"><i class="fas fa-user-lock"></i> Arrested</span>
+      {% else %}<span class="pill pill-closed">Cleared</span>{% endif %}
+      {% if person.danger_level == 'Extreme' %}<span class="pill" style="background:rgba(232,64,64,.2);color:var(--red);font-weight:700">EXTREME DANGER</span>
+      {% elif person.danger_level == 'High' %}<span class="pill pill-high">High Danger</span>
+      {% elif person.danger_level == 'Medium' %}<span class="pill pill-medium">Medium Danger</span>
+      {% else %}<span class="pill pill-low">Low Danger</span>{% endif %}
+    </div>
+    <div style="width:100%;text-align:left;font-size:.85rem;color:var(--text2);display:flex;flex-direction:column;gap:6px">
+      {% if person.age %}<div><i class="fas fa-user" style="width:16px;color:var(--text3)"></i> Age {{ person.age }}</div>{% endif %}
+      {% if person.gender %}<div><i class="fas fa-venus-mars" style="width:16px;color:var(--text3)"></i> {{ person.gender }}</div>{% endif %}
+      <div><i class="fas fa-gavel" style="width:16px;color:var(--text3)"></i> {{ person.crime_type }}</div>
+      {% if person.last_seen_location %}<div><i class="fas fa-location-dot" style="width:16px;color:var(--text3)"></i> {{ person.last_seen_location }}</div>{% endif %}
+      <div><i class="fas fa-calendar" style="width:16px;color:var(--text3)"></i> Posted {{ person.created_at.strftime('%b %d, %Y') }}</div>
+      <div><i class="fas fa-id-badge" style="width:16px;color:var(--text3)"></i> By {{ person.posted_by.full_name }}</div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Description</span></div>
+      <p style="color:var(--text2);line-height:1.7;white-space:pre-line">{{ person.description }}</p>
+      {% if person.reward_info %}
+      <div class="alert alert-success" style="margin-top:16px"><i class="fas fa-money-bill-wave"></i> Reward: {{ person.reward_info }}</div>
+      {% endif %}
+      {% if person.status == 'Wanted' %}
+      <div class="alert alert-error" style="margin-top:16px"><i class="fas fa-phone"></i> Do not approach. If you have information, contact the nearest police station immediately.</div>
+      {% endif %}
+    </div>
+
+    {% if person.status != 'Wanted' and person.resolution_notes %}
+    <div class="card">
+      <div class="card-header"><span class="card-title">Resolution Notes</span></div>
+      <p style="color:var(--text2);line-height:1.7">{{ person.resolution_notes }}</p>
+      <p style="color:var(--text3);font-size:.8rem;margin-top:10px">Resolved by {{ person.resolved_by.full_name if person.resolved_by }} on {{ person.resolved_at.strftime('%b %d, %Y') if person.resolved_at }}</p>
+    </div>
+    {% endif %}
+
+    {% if current_user.role in ['admin','officer'] and person.status == 'Wanted' %}
+    <div class="card">
+      <div class="card-header"><span class="card-title">Update Status</span></div>
+      <form method="POST" action="{{ url_for('wanted_update_status', wid=person.id) }}">
+        <div class="form-group">
+          <label>New Status</label>
+          <select name="status" required>
+            <option value="">Select…</option>
+            <option value="Found">Found</option>
+            <option value="Arrested">Arrested</option>
+            <option value="Cleared">Cleared of Suspicion</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea name="resolution_notes" rows="3" placeholder="Details about how/where this person was found or resolved…"></textarea>
+        </div>
+        <p style="color:var(--text3);font-size:.8rem;margin-bottom:14px"><i class="fas fa-bullhorn"></i> This will broadcast a public notification to all registered users.</p>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-bullhorn"></i> Update &amp; Notify Public</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

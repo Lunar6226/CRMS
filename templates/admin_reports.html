@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}All Reports – CRMS{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <h1>All Reports</h1>
+  <p>Search, filter, and manage all crime reports</p>
+</div>
+
+<div class="card fade-in" style="margin-bottom:20px">
+  <form method="GET" style="display:flex;gap:10px;flex-wrap:wrap">
+    <input name="q" value="{{ q }}" placeholder="Search case #, type, location…" style="flex:1;min-width:200px">
+    <select name="status" style="width:200px">
+      <option value="">All Statuses</option>
+      <option {% if status_filter=='Pending' %}selected{% endif %}>Pending</option>
+      <option {% if status_filter=='Under Investigation' %}selected{% endif %}>Under Investigation</option>
+      <option {% if status_filter=='Resolved' %}selected{% endif %}>Resolved</option>
+      <option {% if status_filter=='Closed' %}selected{% endif %}>Closed</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:.85rem;color:var(--text2);cursor:pointer;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:0 14px">
+      <input type="checkbox" name="ai" value="1" {% if ai_only=='1' %}checked{% endif %} style="width:auto;cursor:pointer">
+      <i class="fas fa-robot" style="color:var(--purple)"></i> AI-flagged only
+    </label>
+    <button type="submit" class="btn btn-primary"><i class="fas fa-magnifying-glass"></i> Search</button>
+    <a href="{{ url_for('admin_reports') }}" class="btn btn-outline"><i class="fas fa-xmark"></i> Clear</a>
+  </form>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <span class="card-title">{{ reports|length }} Report{{ 's' if reports|length!=1 }} Found</span>
+  </div>
+  {% if reports %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Case #</th><th>Type</th><th>Reporter</th><th>Location</th><th>Priority</th><th>Status</th><th>Assigned</th><th>Date</th><th></th></tr></thead>
+      <tbody>
+        {% for r in reports %}
+        <tr>
+          <td>
+            <code style="font-size:.78rem;color:var(--accent)">{{ r.case_number }}</code>
+            {% if r.ai_flagged %}<span class="pill" title="{{ r.ai_flag_reasons }}" style="background:rgba(136,96,232,.15);color:var(--purple);margin-top:4px;display:inline-flex"><i class="fas fa-robot"></i> AI? {{ r.ai_flag_score|round|int }}%</span>{% endif %}
+          </td>
+          <td>{{ r.crime_type }}</td>
+          <td>{% if r.anonymous %}<span style="color:var(--text3)">Anonymous</span>{% else %}{{ r.reporter.full_name }}{% endif %}</td>
+          <td style="color:var(--text2);font-size:.82rem">{{ r.location[:28] }}{% if r.location|length>28 %}…{% endif %}</td>
+          <td>{% if r.priority=='High'%}<span class="pill pill-high">{{r.priority}}</span>{% elif r.priority=='Medium'%}<span class="pill pill-medium">{{r.priority}}</span>{% else %}<span class="pill pill-low">{{r.priority}}</span>{% endif %}</td>
+          <td>{% if r.status=='Pending'%}<span class="pill pill-pending">{{r.status}}</span>{% elif r.status=='Under Investigation'%}<span class="pill pill-investigating">{{r.status}}</span>{% elif r.status=='Resolved'%}<span class="pill pill-resolved">{{r.status}}</span>{% else %}<span class="pill pill-closed">{{r.status}}</span>{% endif %}</td>
+          <td style="font-size:.82rem;color:var(--text2)">{{ r.assigned_officer.full_name if r.assigned_officer else '—' }}</td>
+          <td style="font-size:.78rem;color:var(--text3)">{{ r.created_at.strftime('%b %d, %Y') }}</td>
+          <td><a href="{{ url_for('admin_report_detail', rid=r.id) }}" class="btn btn-sm btn-outline"><i class="fas fa-pencil"></i> Manage</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><i class="fas fa-folder-open"></i><p>No reports found</p></div>
+  {% endif %}
+</div>
+{% endblock %}

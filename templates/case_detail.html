@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Case {{ report.case_number }} – CRMS{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <div class="breadcrumb">Dashboard / Track / <span>{{ report.case_number }}</span></div>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px">
+    <div>
+      <h1 style="font-family:var(--mono);font-size:1.4rem">{{ report.case_number }}</h1>
+      <p>{{ report.crime_type }} — {{ report.location }}</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      {% if report.status == 'Pending' %}<span class="pill pill-pending" style="font-size:.9rem;padding:6px 14px">{{ report.status }}</span>
+      {% elif report.status == 'Under Investigation' %}<span class="pill pill-investigating" style="font-size:.9rem;padding:6px 14px">{{ report.status }}</span>
+      {% elif report.status == 'Resolved' %}<span class="pill pill-resolved" style="font-size:.9rem;padding:6px 14px">{{ report.status }}</span>
+      {% else %}<span class="pill pill-closed" style="font-size:.9rem;padding:6px 14px">{{ report.status }}</span>{% endif %}
+      {% if report.priority == 'High' %}<span class="pill pill-high" style="font-size:.9rem;padding:6px 14px">{{ report.priority }} Priority</span>
+      {% elif report.priority == 'Medium' %}<span class="pill pill-medium" style="font-size:.9rem;padding:6px 14px">{{ report.priority }} Priority</span>
+      {% else %}<span class="pill pill-low" style="font-size:.9rem;padding:6px 14px">{{ report.priority }} Priority</span>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:20px">
+  <div>
+    <div class="card fade-in" style="margin-bottom:20px">
+      <div class="card-title" style="margin-bottom:16px">Case Information</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div><div style="font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Crime Type</div><div style="margin-top:4px">{{ report.crime_type }}</div></div>
+        <div><div style="font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Location</div><div style="margin-top:4px">{{ report.location }}</div></div>
+        <div><div style="font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Incident Date</div><div style="margin-top:4px">{{ report.incident_date.strftime('%B %d, %Y at %H:%M') }}</div></div>
+        <div><div style="font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Reported On</div><div style="margin-top:4px">{{ report.created_at.strftime('%B %d, %Y') }}</div></div>
+        {% if report.assigned_officer %}<div><div style="font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Assigned Officer</div><div style="margin-top:4px">{{ report.assigned_officer.full_name }}</div></div>{% endif %}
+        <div><div style="font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Anonymous</div><div style="margin-top:4px">{{ 'Yes' if report.anonymous else 'No' }}</div></div>
+      </div>
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Description</div>
+        <p style="color:var(--text2);line-height:1.7">{{ report.description }}</p>
+      </div>
+    </div>
+
+    {% if report.evidence %}
+    <div class="card fade-in" style="margin-bottom:20px">
+      <div class="card-title" style="margin-bottom:16px"><i class="fas fa-paperclip"></i> Evidence ({{ report.evidence|length }} file{{ 's' if report.evidence|length!=1 }})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        {% for ev in report.evidence %}
+        {% if 'image' in ev.file_type %}
+        <a href="{{ url_for('uploaded_file', filename=ev.filename) }}" target="_blank">
+          <img src="{{ url_for('uploaded_file', filename=ev.filename) }}" style="width:100px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+        </a>
+        {% else %}
+        <a href="{{ url_for('uploaded_file', filename=ev.filename) }}" target="_blank" class="btn btn-sm btn-outline">
+          <i class="fas fa-file"></i> {{ ev.original_name[:20] }}
+        </a>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div>
+    <div class="card fade-in">
+      <div class="card-title" style="margin-bottom:16px"><i class="fas fa-timeline"></i> Case Timeline</div>
+      <ul class="timeline">
+        <li class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-time">{{ report.created_at.strftime('%b %d, %Y') }}</div>
+          <div class="tl-msg">Case reported and submitted</div>
+        </li>
+        {% for upd in report.updates|sort(attribute='created_at') %}
+        <li class="tl-item">
+          <div class="tl-dot" style="background:{% if upd.status_change == 'Resolved' %}var(--green){% elif upd.status_change %}var(--blue){% else %}var(--text3){% endif %}"></div>
+          <div class="tl-time">{{ upd.created_at.strftime('%b %d, %Y %H:%M') }}{% if upd.officer %} · {{ upd.officer.full_name }}{% endif %}</div>
+          {% if upd.status_change %}<div style="margin-top:3px"><span class="pill pill-{% if upd.status_change=='Resolved' %}resolved{% elif upd.status_change=='Under Investigation' %}investigating{% else %}pending{% endif %}" style="font-size:.72rem">→ {{ upd.status_change }}</span></div>{% endif %}
+          <div class="tl-msg">{{ upd.message }}</div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% if not report.updates %}
+      <p style="color:var(--text3);font-size:.85rem;text-align:center;padding:16px 0">No updates yet</p>
+      {% endif %}
+    </div>
+
+    <div class="card fade-in" style="margin-top:20px">
+      <div class="card-title" style="margin-bottom:16px"><i class="fas fa-comments"></i> Case Discussion</div>
+      <div class="chat-box" id="chatBox"><div class="empty" style="padding:20px"><i class="fas fa-spinner fa-spin"></i></div></div>
+      <div class="chat-input-row">
+        <textarea id="chatInput" placeholder="Ask a question or add more details for the officer…"></textarea>
+        <button class="btn btn-primary btn-icon" id="chatSendBtn" title="Send"><i class="fas fa-paper-plane"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const REPORT_ID = {{ report.id }};
+const chatBox = document.getElementById('chatBox');
+const chatInput = document.getElementById('chatInput');
+const chatSendBtn = document.getElementById('chatSendBtn');
+
+async function loadMessages(){
+  const r = await fetch(`/api/case/${REPORT_ID}/messages`);
+  if(!r.ok) return;
+  const data = await r.json();
+  if(!data.length){
+    chatBox.innerHTML = '<p style="color:var(--text3);font-size:.85rem;text-align:center;padding:16px 0">No messages yet — start the conversation.</p>';
+    return;
+  }
+  chatBox.innerHTML = data.map(m => `
+    <div class="chat-bubble ${m.mine ? 'mine' : 'theirs'}">
+      <div>${escapeHtml(m.message)}</div>
+      <div class="chat-meta">${m.mine ? 'You' : escapeHtml(m.sender_name)} · ${m.created_at}</div>
+    </div>`).join('');
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+async function sendMessage(){
+  const text = chatInput.value.trim();
+  if(!text) return;
+  chatSendBtn.disabled = true;
+  try{
+    const r = await fetch(`/api/case/${REPORT_ID}/messages`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:text})
+    });
+    if(r.ok){ chatInput.value=''; await loadMessages(); }
+  } finally { chatSendBtn.disabled = false; }
+}
+chatSendBtn.addEventListener('click', sendMessage);
+chatInput.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); } });
+loadMessages();
+setInterval(loadMessages, 8000);
+</script>
+{% endblock %}

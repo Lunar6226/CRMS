@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard – CRMS{% endblock %}
+{% block extra_styles %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <h1>Admin Dashboard</h1>
+  <p>Overview of all crime reports and system activity</p>
+</div>
+
+<div class="stat-grid">
+  <a href="{{ url_for('admin_reports') }}" class="stat-card fade-in" style="--stat-color:var(--accent)">
+    <div class="stat-icon" style="background:rgba(232,160,32,.12);color:var(--accent)"><i class="fas fa-folder-open"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-label">Total Cases</div>
+    </div>
+  </a>
+  <a href="{{ url_for('admin_reports', status='Pending') }}" class="stat-card fade-in" style="--stat-color:var(--red)">
+    <div class="stat-icon" style="background:rgba(232,64,64,.12);color:var(--red)"><i class="fas fa-clock"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ stats.pending }}</div>
+      <div class="stat-label">Pending</div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width:{{ (stats.pending / stats.total * 100) if stats.total else 0 }}%"></div></div>
+    </div>
+  </a>
+  <a href="{{ url_for('admin_reports', status='Under Investigation') }}" class="stat-card fade-in" style="--stat-color:var(--blue)">
+    <div class="stat-icon" style="background:rgba(48,128,232,.12);color:var(--blue)"><i class="fas fa-magnifying-glass"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ stats.investigating }}</div>
+      <div class="stat-label">Investigating</div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width:{{ (stats.investigating / stats.total * 100) if stats.total else 0 }}%"></div></div>
+    </div>
+  </a>
+  <a href="{{ url_for('admin_reports', status='Resolved') }}" class="stat-card fade-in" style="--stat-color:var(--green)">
+    <div class="stat-icon" style="background:rgba(48,192,96,.12);color:var(--green)"><i class="fas fa-circle-check"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ stats.resolved }}</div>
+      <div class="stat-label">Resolved</div>
+      <div class="stat-bar"><div class="stat-bar-fill" style="width:{{ (stats.resolved / stats.total * 100) if stats.total else 0 }}%"></div></div>
+    </div>
+  </a>
+  <a href="{{ url_for('wanted_list') }}" class="stat-card fade-in" style="--stat-color:var(--red)">
+    <div class="stat-icon" style="background:rgba(232,64,64,.12);color:var(--red)"><i class="fas fa-user-secret"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ stats.wanted_active }}</div>
+      <div class="stat-label">Active Wanted Persons</div>
+    </div>
+  </a>
+  <a href="{{ url_for('officer_emergencies') }}" class="stat-card fade-in" style="--stat-color:var(--red)">
+    <div class="stat-icon" style="background:rgba(232,64,64,.12);color:var(--red)"><i class="fas fa-triangle-exclamation"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ stats.emergencies_active }}{% if stats.emergencies_active > 0 %}<span class="stat-pulse"></span>{% endif %}</div>
+      <div class="stat-label">Active Emergencies</div>
+    </div>
+  </a>
+  <a href="{{ url_for('admin_reports', ai=1) }}" class="stat-card fade-in" style="--stat-color:var(--purple)">
+    <div class="stat-icon" style="background:rgba(136,96,232,.12);color:var(--purple)"><i class="fas fa-robot"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ stats.ai_flagged }}</div>
+      <div class="stat-label">AI-Flagged Reports</div>
+    </div>
+  </a>
+  <a href="{{ url_for('admin_users') if current_user.role=='admin' else url_for('admin_reports') }}" class="stat-card fade-in" style="--stat-color:var(--purple)">
+    <div class="stat-icon" style="background:rgba(136,96,232,.12);color:var(--purple)"><i class="fas fa-users"></i></div>
+    <div class="stat-body">
+      <div class="stat-value">{{ stats.users }}</div>
+      <div class="stat-label">Registered Users</div>
+    </div>
+  </a>
+</div>
+
+<div class="quick-links fade-in">
+  <a href="{{ url_for('wanted_new') }}" class="quick-link" style="--qcolor:var(--accent)">
+    <div class="qi"><i class="fas fa-bullhorn"></i></div>
+    <div class="qt">New Wanted Alert</div>
+    <div class="qd">Publish a public safety announcement</div>
+  </a>
+  <a href="{{ url_for('admin_reports') }}" class="quick-link" style="--qcolor:var(--blue)">
+    <div class="qi"><i class="fas fa-folder-open"></i></div>
+    <div class="qt">Manage Reports</div>
+    <div class="qd">Search, filter, and update cases</div>
+  </a>
+  {% if current_user.role == 'admin' %}
+  <a href="{{ url_for('admin_users') }}" class="quick-link" style="--qcolor:var(--purple)">
+    <div class="qi"><i class="fas fa-users"></i></div>
+    <div class="qt">Manage Users</div>
+    <div class="qd">Roles, access, and account status</div>
+  </a>
+  <a href="{{ url_for('admin_email_settings') }}" class="quick-link" style="--qcolor:var(--green)">
+    <div class="qi"><i class="fas fa-envelope-open-text"></i></div>
+    <div class="qt">Email Settings</div>
+    <div class="qd">Configure outbound notifications</div>
+  </a>
+  {% endif %}
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
+  <div class="card fade-in">
+    <div class="card-header"><span class="card-title">Cases by Status</span></div>
+    <p style="color:var(--text3);font-size:.78rem;margin:-12px 0 16px">Breakdown of all {{ stats.total }} case{{ 's' if stats.total != 1 }} by current status</p>
+    <div style="height:220px"><canvas id="statusChart"></canvas></div>
+  </div>
+  <div class="card fade-in">
+    <div class="card-header"><span class="card-title">Crime Types</span></div>
+    <p style="color:var(--text3);font-size:.78rem;margin:-12px 0 16px">Most frequently reported categories</p>
+    <div style="height:220px"><canvas id="typeChart"></canvas></div>
+  </div>
+</div>
+
+<div class="card fade-in">
+  <div class="card-header">
+    <span class="card-title">Recent Reports</span>
+    <a href="{{ url_for('admin_reports') }}" class="btn btn-sm btn-outline">View All</a>
+  </div>
+  {% if reports %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Case #</th><th>Type</th><th>Reporter</th><th>Location</th><th>Priority</th><th>Status</th><th>Date</th><th></th></tr></thead>
+      <tbody>
+        {% for r in reports %}
+        <tr>
+          <td><code style="font-size:.78rem;color:var(--accent)">{{ r.case_number }}</code></td>
+          <td>{{ r.crime_type }}</td>
+          <td style="color:var(--text2)">{% if r.anonymous %}<span style="color:var(--text3)">Anonymous</span>{% else %}{{ r.reporter.full_name }}{% endif %}</td>
+          <td style="color:var(--text2);font-size:.82rem">{{ r.location[:25] }}{% if r.location|length>25 %}…{% endif %}</td>
+          <td>
+            {% if r.priority == 'High' %}<span class="pill pill-high">{{ r.priority }}</span>
+            {% elif r.priority == 'Medium' %}<span class="pill pill-medium">{{ r.priority }}</span>
+            {% else %}<span class="pill pill-low">{{ r.priority }}</span>{% endif %}
+          </td>
+          <td>
+            {% if r.status == 'Pending' %}<span class="pill pill-pending">{{ r.status }}</span>
+            {% elif r.status == 'Under Investigation' %}<span class="pill pill-investigating">{{ r.status }}</span>
+            {% elif r.status == 'Resolved' %}<span class="pill pill-resolved">{{ r.status }}</span>
+            {% else %}<span class="pill pill-closed">{{ r.status }}</span>{% endif %}
+          </td>
+          <td style="font-size:.8rem;color:var(--text3)">{{ r.created_at.strftime('%b %d') }}</td>
+          <td><a href="{{ url_for('admin_report_detail', rid=r.id) }}" class="btn btn-sm btn-outline"><i class="fas fa-pencil"></i></a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><i class="fas fa-folder-open"></i><p>No reports yet</p></div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const crimeTypes = {{ crime_types|safe }};
+
+// Draws the value at the end of each horizontal bar — direct labels instead of a legend.
+const valueLabelPlugin = {
+  id: 'valueLabels',
+  afterDatasetsDraw(chart){
+    const {ctx} = chart;
+    chart.data.datasets.forEach((dataset, i) => {
+      const meta = chart.getDatasetMeta(i);
+      meta.data.forEach((bar, index) => {
+        const value = dataset.data[index];
+        ctx.save();
+        ctx.fillStyle = '#e8eaf0';
+        ctx.font = "600 12px 'JetBrains Mono'";
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(value, bar.x + 8, bar.y);
+        ctx.restore();
+      });
+    });
+  }
+};
+
+const tooltipStyle = {
+  backgroundColor: '#1a1e2e', titleColor: '#e8eaf0', bodyColor: '#9099b0',
+  borderColor: '#2a2f45', borderWidth: 1, padding: 10, cornerRadius: 8, displayColors: false
+};
+
+const statusEntries = [
+  ['Pending', {{ stats.pending }}, '#e8a020'],
+  ['Investigating', {{ stats.investigating }}, '#3080e8'],
+  ['Resolved', {{ stats.resolved }}, '#30c060'],
+  ['Closed', {{ stats.total - stats.pending - stats.investigating - stats.resolved }}, '#6070a0']
+];
+const statusTotal = statusEntries.reduce((s, e) => s + e[1], 0);
+
+new Chart(document.getElementById('statusChart'), {
+  type: 'bar',
+  data: {
+    labels: statusEntries.map(e => e[0]),
+    datasets: [{ data: statusEntries.map(e => e[1]), backgroundColor: statusEntries.map(e => e[2]), borderRadius: 6, barThickness: 22 }]
+  },
+  plugins: [valueLabelPlugin],
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    layout: { padding: { right: 34 } },
+    scales: {
+      x: { beginAtZero: true, ticks: { color: '#6070a0', stepSize: 1, precision: 0 }, grid: { color: '#2a2f45' } },
+      y: { ticks: { color: '#9099b0', font: { weight: '500' } }, grid: { display: false } }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: { ...tooltipStyle, callbacks: { label: ctx => `${ctx.parsed.x} case${ctx.parsed.x !== 1 ? 's' : ''} (${statusTotal ? Math.round(ctx.parsed.x / statusTotal * 100) : 0}%)` } }
+    }
+  }
+});
+
+const crimeEntries = Object.entries(crimeTypes).sort((a, b) => b[1] - a[1]);
+new Chart(document.getElementById('typeChart'), {
+  type: 'bar',
+  data: {
+    labels: crimeEntries.map(e => e[0]),
+    datasets: [{ data: crimeEntries.map(e => e[1]), backgroundColor: 'rgba(232,160,32,.75)', borderRadius: 6, barThickness: 18 }]
+  },
+  plugins: [valueLabelPlugin],
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    layout: { padding: { right: 34 } },
+    scales: {
+      x: { beginAtZero: true, ticks: { color: '#6070a0', stepSize: 1, precision: 0 }, grid: { color: '#2a2f45' } },
+      y: { ticks: { color: '#9099b0' }, grid: { display: false } }
+    },
+    plugins: { legend: { display: false }, tooltip: tooltipStyle }
+  }
+});
+</script>
+{% endblock %}

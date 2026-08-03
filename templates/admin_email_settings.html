@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Email Settings – CRMS{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <div class="breadcrumb">Admin / <span>Email Settings</span></div>
+  <h1>Email Settings</h1>
+  <p>Configure Gmail credentials for sending verification and notification emails</p>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;align-items:start">
+
+  <!-- Main Settings Form -->
+  <div class="card fade-in">
+    <div class="card-header">
+      <span class="card-title"><i class="fas fa-gear" style="color:var(--accent)"></i> Gmail Configuration</span>
+      {% if cfg %}
+      <span class="pill pill-resolved"><i class="fas fa-circle-check"></i> Configured</span>
+      {% else %}
+      <span class="pill pill-pending"><i class="fas fa-circle-exclamation"></i> Not Configured</span>
+      {% endif %}
+    </div>
+
+    <form method="POST">
+      <input type="hidden" name="action" value="save">
+      <div class="form-group">
+        <label>Sender Name</label>
+        <input type="text" name="sender_name" value="{{ cfg.sender_name if cfg else 'CRMS Tanzania' }}" placeholder="CRMS Tanzania">
+        <p style="font-size:.78rem;color:var(--text3);margin-top:5px">This name appears in the "From" field of all emails.</p>
+      </div>
+      <div class="form-group">
+        <label>Gmail Address</label>
+        <div style="position:relative">
+          <input type="email" name="gmail_address" value="{{ cfg.gmail_address if cfg else '' }}" placeholder="youraddress@gmail.com" style="padding-left:40px" required>
+          <i class="fas fa-envelope" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:.9rem"></i>
+        </div>
+        <p style="font-size:.78rem;color:var(--text3);margin-top:5px">Must be a Gmail address (e.g. crms.notifications@gmail.com)</p>
+      </div>
+      <div class="form-group">
+        <label>Gmail App Password</label>
+        <div style="position:relative">
+          <input type="password" name="gmail_app_password" id="appPassInput" value="{{ cfg.gmail_app_password if cfg else '' }}" placeholder="xxxx xxxx xxxx xxxx" style="padding-left:40px;font-family:var(--mono)" required>
+          <i class="fas fa-key" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:.9rem"></i>
+          <button type="button" onclick="togglePass()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:.9rem" id="eyeBtn"><i class="fas fa-eye"></i></button>
+        </div>
+        <p style="font-size:.78rem;color:var(--text3);margin-top:5px">
+          This is a 16-character App Password, <strong style="color:var(--text2)">not your regular Gmail password</strong>.
+        </p>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Settings</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Right column -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+
+    <!-- Email Verification Toggle -->
+    <div class="card fade-in">
+      <div class="card-title" style="margin-bottom:14px"><i class="fas fa-user-shield" style="color:var(--accent)"></i> Email Verification</div>
+      <p style="font-size:.82rem;color:var(--text3);margin-bottom:14px">When enabled, new users must verify their email before they can log in. Turn this off for testing or if Gmail isn't configured yet.</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <span id="verifStatusLabel" style="font-size:.85rem;color:var(--text)">
+          {% if sys_cfg.require_email_verification %}Required{% else %}Disabled{% endif %}
+        </span>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
+          <input type="checkbox" id="verifToggle" {% if sys_cfg.require_email_verification %}checked{% endif %} style="opacity:0;width:0;height:0" onchange="toggleVerification()">
+          <span id="verifSlider" style="position:absolute;inset:0;background:{% if sys_cfg.require_email_verification %}var(--accent){% else %}var(--border){% endif %};border-radius:24px;transition:.2s;cursor:pointer" onclick="document.getElementById('verifToggle').click()"></span>
+          <span id="verifKnob" style="position:absolute;height:18px;width:18px;left:{% if sys_cfg.require_email_verification %}23px{% else %}3px{% endif %};top:3px;background:#fff;border-radius:50%;transition:.2s;pointer-events:none"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Test Email -->
+    <div class="card fade-in">
+      <div class="card-title" style="margin-bottom:16px"><i class="fas fa-flask" style="color:var(--blue)"></i> Send Test Email</div>
+      {% if cfg %}
+      <form method="POST">
+        <input type="hidden" name="action" value="test">
+        <div class="form-group">
+          <label>Send To</label>
+          <input type="email" name="test_email" value="{{ current_user.email }}" placeholder="test@example.com">
+        </div>
+        <button type="submit" class="btn btn-outline" style="width:100%;justify-content:center;border-color:var(--blue);color:var(--blue)">
+          <i class="fas fa-paper-plane"></i> Send Test Email
+        </button>
+      </form>
+      {% else %}
+      <div class="empty" style="padding:16px">
+        <i class="fas fa-gear" style="font-size:1.5rem"></i>
+        <p style="margin-top:8px;font-size:.85rem">Save settings first to enable test email</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Status -->
+    {% if cfg %}
+    <div class="card fade-in">
+      <div class="card-title" style="margin-bottom:14px"><i class="fas fa-circle-info" style="color:var(--accent)"></i> Current Config</div>
+      <div style="font-size:.82rem;display:flex;flex-direction:column;gap:10px">
+        <div>
+          <div style="color:var(--text3);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Gmail Account</div>
+          <div style="color:var(--text);margin-top:2px">{{ cfg.gmail_address }}</div>
+        </div>
+        <div>
+          <div style="color:var(--text3);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Sender Name</div>
+          <div style="color:var(--text);margin-top:2px">{{ cfg.sender_name }}</div>
+        </div>
+        <div>
+          <div style="color:var(--text3);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">App Password</div>
+          <div style="color:var(--text);margin-top:2px;font-family:var(--mono)">••••••••••••••••</div>
+        </div>
+        <div>
+          <div style="color:var(--text3);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Last Updated</div>
+          <div style="color:var(--text);margin-top:2px">{{ cfg.updated_at.strftime('%b %d, %Y %H:%M') }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- How to get App Password -->
+    <div class="card fade-in" style="border-color:rgba(232,160,32,.3)">
+      <div class="card-title" style="margin-bottom:14px"><i class="fas fa-lightbulb" style="color:var(--accent)"></i> How to Get App Password</div>
+      <ol style="list-style:none;font-size:.82rem;color:var(--text2);display:flex;flex-direction:column;gap:10px;padding:0">
+        <li style="display:flex;gap:10px"><span style="background:rgba(232,160,32,.15);color:var(--accent);border-radius:50%;width:22px;height:22px;display:grid;place-items:center;font-size:.7rem;font-weight:700;flex-shrink:0">1</span><span>Go to your <a href="https://myaccount.google.com/security" target="_blank" style="color:var(--accent)">Google Account Security</a></span></li>
+        <li style="display:flex;gap:10px"><span style="background:rgba(232,160,32,.15);color:var(--accent);border-radius:50%;width:22px;height:22px;display:grid;place-items:center;font-size:.7rem;font-weight:700;flex-shrink:0">2</span><span>Enable <strong style="color:var(--text)">2-Step Verification</strong> if not already enabled</span></li>
+        <li style="display:flex;gap:10px"><span style="background:rgba(232,160,32,.15);color:var(--accent);border-radius:50%;width:22px;height:22px;display:grid;place-items:center;font-size:.7rem;font-weight:700;flex-shrink:0">3</span><span>Search for <strong style="color:var(--text)">"App Passwords"</strong> in your Google Account</span></li>
+        <li style="display:flex;gap:10px"><span style="background:rgba(232,160,32,.15);color:var(--accent);border-radius:50%;width:22px;height:22px;display:grid;place-items:center;font-size:.7rem;font-weight:700;flex-shrink:0">4</span><span>Select app <strong style="color:var(--text)">"Mail"</strong> → device <strong style="color:var(--text)">"Other"</strong> → name it "CRMS"</span></li>
+        <li style="display:flex;gap:10px"><span style="background:rgba(232,160,32,.15);color:var(--accent);border-radius:50%;width:22px;height:22px;display:grid;place-items:center;font-size:.7rem;font-weight:700;flex-shrink:0">5</span><span>Copy the <strong style="color:var(--text)">16-character password</strong> and paste it above</span></li>
+      </ol>
+      <div style="margin-top:14px;padding:10px;background:rgba(232,160,32,.05);border-radius:6px;font-size:.78rem;color:var(--text3)">
+        <i class="fas fa-shield-halved" style="color:var(--accent)"></i> App Passwords are more secure than your main password. Stored encrypted in the database.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function toggleVerification(){
+  const r = await fetch('/admin/toggle-verification', {method:'POST'});
+  const data = await r.json();
+  const label = document.getElementById('verifStatusLabel');
+  const slider = document.getElementById('verifSlider');
+  const knob = document.getElementById('verifKnob');
+  if(data.require_email_verification){
+    label.textContent='Required'; slider.style.background='var(--accent)'; knob.style.left='23px';
+  } else {
+    label.textContent='Disabled'; slider.style.background='var(--border)'; knob.style.left='3px';
+  }
+}
+function togglePass(){
+  const inp = document.getElementById('appPassInput');
+  const btn = document.getElementById('eyeBtn');
+  if(inp.type==='password'){inp.type='text';btn.innerHTML='<i class="fas fa-eye-slash"></i>';}
+  else{inp.type='password';btn.innerHTML='<i class="fas fa-eye"></i>';}
+}
+</script>
+{% endblock %}

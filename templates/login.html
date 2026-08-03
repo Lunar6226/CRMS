@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Login – CRMS{% endblock %}
+{% block public_content %}
+<style>
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:80px 16px 32px;background:var(--bg)}
+.auth-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px;width:100%;max-width:420px}
+.auth-logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.1rem;margin-bottom:32px;justify-content:center}
+.auth-logo .shield{width:40px;height:40px;background:var(--accent);border-radius:10px;display:grid;place-items:center;color:#000;font-size:1.1rem}
+h2{font-size:1.5rem;font-weight:700;margin-bottom:6px}
+.auth-sub{color:var(--text2);font-size:.9rem;margin-bottom:28px}
+.auth-footer{text-align:center;margin-top:20px;font-size:.875rem;color:var(--text2)}
+</style>
+<div class="auth-wrap">
+  <div class="auth-card fade-in">
+    <div class="auth-logo"><div class="shield"><i class="fas fa-shield-halved"></i></div>My CRMS Tanzania</div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ 'success' if cat=='success' else 'error' }}"><i class="fas fa-circle-exclamation"></i> {{ msg }}</div>
+    {% endfor %}
+    {% endwith %}
+    <h2>Welcome back</h2>
+    <p class="auth-sub">Sign in to access your account</p>
+    <form method="POST">
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" name="email" placeholder="you@example.com" required>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" placeholder="••••••••" required>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px"><i class="fas fa-right-to-bracket"></i> Sign In</button>
+    </form>
+    <div class="auth-footer">Don't have an account? <a href="{{ url_for('register') }}">Register here</a></div>
+  </div>
+</div>
+{% endblock %}

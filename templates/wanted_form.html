@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}New Wanted Announcement – CRMS{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <div class="breadcrumb"><a href="{{ url_for('wanted_list') }}">Wanted Persons</a> / <span>New Announcement</span></div>
+  <h1>New Wanted Announcement</h1>
+  <p>Publish a wanted person notice. Marking someone as an immediate public danger will alert every user right away.</p>
+</div>
+
+<div class="card fade-in" style="max-width:760px">
+  <form method="POST" enctype="multipart/form-data">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Full Name *</label>
+        <input type="text" name="full_name" placeholder="e.g. John Doe" required>
+      </div>
+      <div class="form-group">
+        <label>Alias / Nickname</label>
+        <input type="text" name="alias" placeholder="e.g. 'The Fox'">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Age</label>
+        <input type="number" name="age" min="1" max="120" placeholder="e.g. 34">
+      </div>
+      <div class="form-group">
+        <label>Gender</label>
+        <select name="gender">
+          <option value="">Unknown</option>
+          <option>Male</option>
+          <option>Female</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Crime / Reason Wanted *</label>
+        <select name="crime_type" required>
+          <option value="">Select crime type…</option>
+          <option>Theft</option>
+          <option>Robbery</option>
+          <option>Assault</option>
+          <option>Murder</option>
+          <option>Rape / Sexual Assault</option>
+          <option>Domestic Violence</option>
+          <option>Fraud / Scam</option>
+          <option>Cybercrime</option>
+          <option>Drug Trafficking</option>
+          <option>Kidnapping</option>
+          <option>Armed Robbery</option>
+          <option>Terrorism</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Danger Level *</label>
+        <select name="danger_level" required id="dangerSelect">
+          <option value="Low">Low</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="High">High</option>
+          <option value="Extreme">Extreme – Immediate Danger to Public</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Last Seen Location</label>
+      <input type="text" name="last_seen_location" placeholder="e.g. Kariakoo Market, Dar es Salaam">
+    </div>
+
+    <div class="form-group">
+      <label>Description *</label>
+      <textarea name="description" placeholder="Physical description, known behavior, circumstances of the crime, etc…" rows="5" required></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Reward Information (optional)</label>
+      <input type="text" name="reward_info" placeholder="e.g. TZS 500,000 for information leading to arrest">
+    </div>
+
+    <div class="form-group">
+      <label>Photo</label>
+      <div id="dropzone" style="border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:.2s" onclick="document.getElementById('photo').click()">
+        <i class="fas fa-camera" style="font-size:2rem;color:var(--text3);margin-bottom:10px;display:block"></i>
+        <p style="color:var(--text2);font-size:.9rem">Click to upload a photo</p>
+        <p style="color:var(--text3);font-size:.8rem;margin-top:4px">JPG, PNG, GIF — Max 16 MB</p>
+      </div>
+      <input type="file" id="photo" name="photo" accept=".jpg,.jpeg,.png,.gif" style="display:none" onchange="showFile(this)">
+      <div id="file-list" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px"></div>
+    </div>
+
+    <div class="form-group" id="publicAlertGroup">
+      <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:.875rem;cursor:pointer">
+        <input type="checkbox" name="public_alert" id="publicAlertCheck" style="width:auto;cursor:pointer">
+        <span style="color:var(--text)">Send an immediate public alert notification to every registered user</span>
+      </label>
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:8px">
+      <button type="submit" class="btn btn-primary"><i class="fas fa-bullhorn"></i> Publish Announcement</button>
+      <a href="{{ url_for('wanted_list') }}" class="btn btn-outline"><i class="fas fa-xmark"></i> Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const dropzone = document.getElementById('dropzone');
+dropzone.addEventListener('dragover', e=>{ e.preventDefault(); dropzone.style.borderColor='var(--accent)'; });
+dropzone.addEventListener('dragleave', ()=>{ dropzone.style.borderColor='var(--border)'; });
+dropzone.addEventListener('drop', e=>{ e.preventDefault(); dropzone.style.borderColor='var(--border)'; document.getElementById('photo').files=e.dataTransfer.files; showFile(document.getElementById('photo')); });
+function showFile(input){
+  const list=document.getElementById('file-list');
+  list.innerHTML='';
+  [...input.files].forEach(f=>{
+    const chip=document.createElement('div');
+    chip.style.cssText='display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:.8rem';
+    chip.innerHTML=`<i class="fas fa-file" style="color:var(--accent)"></i>${f.name}`;
+    list.appendChild(chip);
+  });
+}
+const dangerSelect = document.getElementById('dangerSelect');
+const publicAlertCheck = document.getElementById('publicAlertCheck');
+dangerSelect.addEventListener('change', ()=>{
+  if(dangerSelect.value === 'Extreme'){ publicAlertCheck.checked = true; publicAlertCheck.disabled = true; }
+  else { publicAlertCheck.disabled = false; }
+});
+</script>
+{% endblock %}

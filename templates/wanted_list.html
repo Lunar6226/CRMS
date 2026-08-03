@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Wanted Persons – CRMS{% endblock %}
+{% block content %}
+<div class="page-header fade-in">
+  <h1>Wanted Persons</h1>
+  <p>Public safety announcements posted by police. If you recognize anyone below, contact your nearest police station immediately.</p>
+</div>
+
+<div class="card fade-in" style="margin-bottom:20px">
+  <form method="GET" style="display:flex;gap:10px;flex-wrap:wrap">
+    <input name="q" value="{{ q }}" placeholder="Search name, alias, crime…" style="flex:1;min-width:200px">
+    <select name="status" style="width:200px">
+      <option value="" {% if status_filter=='' %}selected{% endif %}>All Statuses</option>
+      <option {% if status_filter=='Wanted' %}selected{% endif %}>Wanted</option>
+      <option {% if status_filter=='Found' %}selected{% endif %}>Found</option>
+      <option {% if status_filter=='Arrested' %}selected{% endif %}>Arrested</option>
+      <option {% if status_filter=='Cleared' %}selected{% endif %}>Cleared</option>
+    </select>
+    <button type="submit" class="btn btn-primary"><i class="fas fa-magnifying-glass"></i> Search</button>
+    <a href="{{ url_for('wanted_list') }}" class="btn btn-outline"><i class="fas fa-xmark"></i> Clear</a>
+    {% if current_user.role in ['admin','officer'] %}
+    <a href="{{ url_for('wanted_new') }}" class="btn btn-primary" style="margin-left:auto"><i class="fas fa-circle-plus"></i> New Announcement</a>
+    {% endif %}
+  </form>
+</div>
+
+{% if people %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:18px">
+  {% for p in people %}
+  <a href="{{ url_for('wanted_detail', wid=p.id) }}" class="card fade-in" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;gap:14px;align-items:center">
+      <div style="width:64px;height:64px;border-radius:10px;overflow:hidden;background:var(--bg3);flex-shrink:0;display:grid;place-items:center">
+        {% if p.photo %}
+        <img src="{{ url_for('uploaded_file', filename=p.photo) }}" style="width:100%;height:100%;object-fit:cover">
+        {% else %}
+        <i class="fas fa-user-secret" style="font-size:1.5rem;color:var(--text3)"></i>
+        {% endif %}
+      </div>
+      <div style="min-width:0">
+        <div style="font-weight:600;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.full_name }}</div>
+        {% if p.alias %}<div style="color:var(--text3);font-size:.78rem">"{{ p.alias }}"</div>{% endif %}
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      {% if p.status == 'Wanted' %}<span class="pill pill-high"><i class="fas fa-triangle-exclamation"></i> Wanted</span>
+      {% elif p.status == 'Found' %}<span class="pill pill-resolved"><i class="fas fa-circle-check"></i> Found</span>
+      {% elif p.status == 'Arrested' %}<span class="pill pill-investigating"><i class="fas fa-user-lock"></i> Arrested</span>
+      {% else %}<span class="pill pill-closed">Cleared</span>{% endif %}
+      {% if p.danger_level == 'Extreme' %}<span class="pill" style="background:rgba(232,64,64,.2);color:var(--red);font-weight:700">EXTREME DANGER</span>
+      {% elif p.danger_level == 'High' %}<span class="pill pill-high">High Danger</span>{% endif %}
+    </div>
+    <div style="color:var(--text2);font-size:.85rem">{{ p.crime_type }}</div>
+    {% if p.last_seen_location %}<div style="color:var(--text3);font-size:.78rem"><i class="fas fa-location-dot"></i> {{ p.last_seen_location }}</div>{% endif %}
+    <div style="color:var(--text3);font-size:.75rem;margin-top:auto">Posted {{ p.created_at.strftime('%b %d, %Y') }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty"><i class="fas fa-user-secret"></i><p>No wanted persons found</p></div>
+{% endif %}
+{% endblock %}
