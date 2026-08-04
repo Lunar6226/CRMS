@@ -1,6 +1,18 @@
 # CRMS
 Criminal report management system.
 
+
+
+
+# Setup and installing
+```
+git clone https://github.com/Lunar6226/CRMS.git
+cd CRMS
+python3 app.py
+
+```
+
+
 ## Initial credentials.
 
 ```
