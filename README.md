@@ -2,6 +2,7 @@
 Criminal report management system.
 
 
+https://github.com/user-attachments/assets/efbd54c0-a780-4d6d-9cc6-c9c021af6ea9
 
 
 # Setup and installing
@@ -18,6 +19,9 @@ python3 app.py
 ```
 admin@crms.go.tz
 Admin@1234
+
+
+
 
 officer@crms.go.tz
 Officer@1234
